@@ -6,13 +6,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="DopeShell",
-    version="1.0.0",
+    version="1.1.2",
     author="Abhishek Sharma",
     author_email="170mailmea@gmail.com",
     description="A Python library for creating secure reverse shells with session management and encryption.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/anonymous300502/DopeShell",
+    url="https://github.com/anonymous300502/DopeShellPyPi",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
