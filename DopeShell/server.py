@@ -78,9 +78,22 @@ class DopeShellServer:
                 client_socket.send(self.encrypt(command.encode('utf-8')))
                 break
 
-            if command.lower() == 'help':
-                for cmd, desc in self.commands.items():
-                    print(f"{cmd}: {desc}")
+            if command.lower().startswith('help'):
+                parts = command.split(maxsplit=1)
+                if len(parts) > 1:
+                    specific_command = parts[1].lower()
+                    description = self.commands.get(specific_command, "Command not found.")
+                    help_text = f"{specific_command}: {description}"
+                else:
+                    help_text = "DopeShell Tool Help\n" \
+                                "====================\n" \
+                                "List of available commands:\n"
+                    for cmd, desc in self.commands.items():
+                        help_text += f"  {cmd:<30} - {desc}\n"
+                    help_text += "\nFor detailed information on a specific command, type 'help <command>'"
+                
+                print(help_text)
+                client_socket.send(self.encrypt(help_text.encode('utf-8')))
                 continue
 
             elif command.lower().startswith('ls'):
