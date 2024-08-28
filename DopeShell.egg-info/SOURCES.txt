@@ -1,0 +1,12 @@
+LICENSE
+README.md
+setup.py
+DopeShell/__init__.py
+DopeShell/client.py
+DopeShell/server.py
+DopeShell.egg-info/PKG-INFO
+DopeShell.egg-info/SOURCES.txt
+DopeShell.egg-info/dependency_links.txt
+DopeShell.egg-info/entry_points.txt
+DopeShell.egg-info/requires.txt
+DopeShell.egg-info/top_level.txt

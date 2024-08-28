@@ -1,0 +1,3 @@
+[console_scripts]
+dopeshell-client = DopeShell.client:main
+dopeshell-server = DopeShell.server:main
