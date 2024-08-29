@@ -70,7 +70,7 @@ dopeshell-client --server-ip 192.168.1.11 --port 4444 --key "myverystrongpasswor
 - persist [Set up persistence to enusre connection on reboot]<br><br><br>
 
 *Image1- initializaiton*
-![Runing server](https://raw.githubusercontent.com/anonymous300502/DopeShellPyPi/blob/main/screenshots/running.png)
+![Runing server](https://github.com/anonymous300502/DopeShellPyPi/blob/main/screenshots/running.png)
 *Image2- Running commands*
 ![basic_usage_1](https://raw.githubusercontent.com/manaswii/DopeShellPyPi/main/screenshots/basic_usage_1.png)<br><br><br>
 *Image3- Switching between sessions* <br>
