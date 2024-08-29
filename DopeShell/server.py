@@ -1,5 +1,8 @@
 # dopeshell/server.py
 # TODO:
+# fix hanging when sessions connect quickly.
+# add location and privilege escalation
+=======
 # differentiate between folders and files in LS command
 import socket
 import threading
