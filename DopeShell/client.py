@@ -1,5 +1,4 @@
 # dopeshell/client.py
-
 import socket
 import subprocess
 import os
