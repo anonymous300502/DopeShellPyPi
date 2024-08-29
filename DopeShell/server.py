@@ -1,6 +1,7 @@
 # dopeshell/server.py
 # TODO:
 # fix hanging when sessions connect quickly.
+# add location and privilege escalation
 import socket
 import threading
 import base64
