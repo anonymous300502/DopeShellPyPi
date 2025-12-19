@@ -3,6 +3,12 @@
 ![Static Badge](https://img.shields.io/badge/License-MIT-white)
 ![Static Badge](https://img.shields.io/badge/PyPi-2.0.1-green)
 
+## Disclaimer
+
+**Please note that this program is for educational purposes only** and should not be used for any malicious activities. The primary goal of this README is to explain the functionality of the program and provide information about the imported modules and functions used in the code.
+The Developers will not be liable to any damage caused by the unethical use of this code. 
+
+
 ## **Introduction**
 
 **DopeShell** is a Python library designed to simplify the creation of secure reverse shells with advanced features like session management, encryption, multiple connections, and obfuscation techniques. This library provides an easy-to-use interface for setting up both the client and server sides of a reverse shell, with the ability to manage multiple sessions, simulate command-line prompts, and more.
